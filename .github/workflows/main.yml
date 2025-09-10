@@ -1,29 +1,39 @@
-name: Telegram Bot
-
+name: VPS with RDP
 on:
-  workflow_dispatch:        # تشغيل يدوي
-  schedule:                 # تشغيل تلقائي كل 3 ساعات
-    - cron: "0 */3 * * *"
+  workflow_dispatch:
 
 jobs:
-  run-bot:
+  rdp-vps:
     runs-on: ubuntu-latest
-    timeout-minutes: 180    # يبقى شغال 3 ساعات
+    timeout-minutes: 360  # يبقى شغال 6 ساعات
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install requirements
+      - name: Install & Configure Desktop + RDP
         run: |
-          python -m pip install --upgrade pip
-          pip install pytelegrambotapi speedtest-cli
+          sudo apt update -y
+          sudo apt install -y xfce4 xfce4-goodies xrdp
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
+          echo "runner:admin@123" | sudo chpasswd
+          echo "✅ RDP user: runner | pass: admin@123"
 
-      - name: Run Telegram Bot
+      - name: Install Tailscale
         run: |
-          echo "✅ Starting Telegram bot..."
-          python bot.py
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rdp-${{ github.run_id }}
+          tsIP=$(tailscale ip -4 | head -n 1)
+          echo "TAILSCALE_IP=$tsIP" >> $GITHUB_ENV
+          echo "✅ Tailscale IP: $tsIP"
+
+      - name: Verify RDP Access
+        run: |
+          echo "Tailscale VPS with RDP ready!"
+          echo "IP: $env:TAILSCALE_IP"
+          echo "User: runner"
+          echo "Pass: admin@123"
+
+      - name: Keep VPS Alive
+        run: |
+          while true; do
+            echo "[$(date)] VPS running..."
+            sleep 300
+          done
